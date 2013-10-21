@@ -49,7 +49,7 @@ char *state_to_str(u_int8_t state);
 
 #ifndef NS_NO_GLOBALS
 #ifdef DEBUG
-#undef DEBUG
+//#undef DEBUG
 #define DEBUG_OUTPUT
 #define DEBUG(l, s, args...) alog(l, s, __FUNCTION__, ## args)
 #else

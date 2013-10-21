@@ -19,15 +19,13 @@
  * Author: Erik Nordström, <erik.nordstrom@it.uu.se>
  * 
  *****************************************************************************/
-/*
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-#include <linux/config.h>
-#endif
-*/
-#ifdef KERNEL26
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
+//#include <linux/config.h>
+//#endif
+//#ifdef KERNEL26
 #include <linux/moduleparam.h>
-#endif
+//#endif
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -53,8 +51,18 @@
 #include "kaodv-debug.h"
 #include "kaodv.h"
 
+/*
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25))
+#define NF_INET_PRE_ROUTING NF_IP_PRE_ROUTING
+#define NF_INET_LOCAL_IN NF_IP_LOCAL_IN
+#define NF_INET_FORWARD NF_IP_FORWARD
+#define NF_INET_LOCAL_OUT NF_IP_LOCAL_OUT
+#define NF_INET_POST_ROUTING NF_IP_POST_ROUTING
+#define NF_INET_NUMHOOKS NF_IP_NUMHOOKS
+#endif
+*/
 #define ACTIVE_ROUTE_TIMEOUT active_route_timeout
-#define MAX_INTERFACES 10
+#define MAX_INTERFACES 20
 
 static int qual = 0;
 static unsigned long pkts_dropped = 0;
@@ -146,7 +154,11 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 		    ntohs(udph->source) == AODV_PORT) {
 
 #ifdef CONFIG_QUAL_THRESHOLD
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+//			qual = (int)(skb)->__unused;
+//#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
 			qual = (skb)->iwq.qual;
+//#endif
 			if (qual_th && hooknum == NF_INET_PRE_ROUTING) {
 
 				if (qual && qual < qual_th) {
@@ -157,36 +169,53 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 #endif /* CONFIG_QUAL_THRESHOLD */
 			if (hooknum == NF_INET_PRE_ROUTING && in)
 				kaodv_update_route_timeouts(hooknum, in, iph);
-
+			
 			return NF_ACCEPT;
 		}
 	}
 	
 	if (hooknum == NF_INET_PRE_ROUTING)
+	{
 		res = if_info_from_ifindex(&ifaddr, &bcaddr, in->ifindex);
+		printk(KERN_DEBUG "kaodv: in->ifindex %d, res %d.\n", in->ifindex, res);
+	}
 	else 
+	{
 		res = if_info_from_ifindex(&ifaddr, &bcaddr, out->ifindex);
+		printk(KERN_DEBUG "kaodv: out->ifindex %d, res %d.\n", out->ifindex, res);
+	}
 	
 	if (res < 0)
+	{
+		printk(KERN_DEBUG "kaodv: No information!\n");
 		return NF_ACCEPT;
-	
+	}
 
 	/* Ignore broadcast and multicast packets */
 	if (iph->daddr == INADDR_BROADCAST ||
 	    IN_MULTICAST(ntohl(iph->daddr)) || 
 	    iph->daddr == bcaddr.s_addr)
+	{
+		printk(KERN_DEBUG "kaodv: Broadcast packet!\n");
 		return NF_ACCEPT;
-
+	}
        
 	/* Check which hook the packet is on... */
+	
+	printk(KERN_DEBUG "kaodv: Check which hook the packet is on...\n");
+	
 	switch (hooknum) {
 	case NF_INET_PRE_ROUTING:
+	
+		printk(KERN_DEBUG "kaodv: NF_INET_PRE_ROUTING\n");
+		
 		kaodv_update_route_timeouts(hooknum, in, iph);
 		
 		/* If we are a gateway maybe we need to decapsulate? */
 		if (is_gateway && iph->protocol == IPPROTO_MIPE &&
 		    iph->daddr == ifaddr.s_addr) {
 			ip_pkt_decapsulate(skb);
+			printk(KERN_DEBUG "kaodv: successfully returned from ip_pkt_decapsulate!\n");
 			iph = SKB_NETWORK_HDR_IPH(skb);
 			return NF_ACCEPT;
 		}
@@ -215,7 +244,8 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 		}
 		break;
 	case NF_INET_LOCAL_OUT:
-
+		printk(KERN_DEBUG "kaodv: NF_INET_LOCAL_OUT\n");
+		
 		if (!kaodv_expl_get(iph->daddr, &e) ||
 		    (e.flags & KAODV_RT_REPAIR)) {
 
@@ -229,24 +259,6 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 			return NF_STOLEN;
 
 		} else if (e.flags & KAODV_RT_GW_ENCAP) {
-#ifdef ENABLE_DISABLED
-			/* Make sure the maximum segment size (MSM) is
-			   reduced to account for the
-			   encapsulation. This is probably not the
-			   nicest way to do it. It works sometimes,
-			   but may freeze due to some locking issue
-			   that needs to be fix... */
-			if (iph->protocol == IPPROTO_TCP) {
-				if (skb->sk) {
-					struct tcp_sock *tp = tcp_sk(skb->sk);
-					if (tp->mss_cache > 1452) {
-						tp->rx_opt.user_mss = 1452;
-						tp->rx_opt.mss_clamp = 1452;
-						tcp_sync_mss(skb->sk, 1452);
-					}
-				}
-			}
-#endif /* ENABLE_DISABLED */
 			/* Make sure that also the virtual Internet
 			 * dest entry is refreshed */
 			kaodv_update_route_timeouts(hooknum, out, iph);
@@ -255,13 +267,18 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 			
 			if (!skb)
 				return NF_STOLEN;
-
+				
+			printk(KERN_DEBUG "kaodv: successfully returned from ip_pkt_encapsulate!\n");
+			
 			ip_route_me_harder(skb, RTN_LOCAL);
 		}
 		break;
 	case NF_INET_POST_ROUTING:
+		printk(KERN_DEBUG "kaodv: NF_INET_POST_ROUTING\n");
 		kaodv_update_route_timeouts(hooknum, out, iph);
+		break;
 	}
+	printk(KERN_DEBUG "kaodv: Succesfully returned from NF_HOOK!\n");
 	return NF_ACCEPT;
 }
 
@@ -286,41 +303,45 @@ int kaodv_proc_info(char *buffer, char **start, off_t offset, int length)
 /*
  * Called when the module is inserted in the kernel.
  */
-static char *ifname[MAX_INTERFACES] = { "eth0" };
+static char *ifname[MAX_INTERFACES] = { "wlan0" };
 
-#ifdef KERNEL26
+//#ifdef KERNEL26
 static int num_parms = 0;
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10))
+//module_param_array(ifname, charp, num_parms, 0444);
+//#else
 module_param_array(ifname, charp, &num_parms, 0444);
+//#endif
 module_param(qual_th, int, 0);
-#else
-MODULE_PARM(ifname, "1-" __MODULE_STRING(MAX_INTERFACES) "s");
-MODULE_PARM(qual_th, "i");
-#endif
+//#else
+//MODULE_PARM(ifname, "1-" __MODULE_STRING(MAX_INTERFACES) "s");
+//MODULE_PARM(qual_th, "i");
+//#endif
 
 static struct nf_hook_ops kaodv_ops[] = {
 	{
 	 .hook = kaodv_hook,
-#ifdef KERNEL26
+//#ifdef KERNEL26
 	 .owner = THIS_MODULE,
-#endif
+//#endif
 	 .pf = PF_INET,
 	 .hooknum = NF_INET_PRE_ROUTING,
 	 .priority = NF_IP_PRI_FIRST,
 	 },
 	{
 	 .hook = kaodv_hook,
-#ifdef KERNEL26
+//#ifdef KERNEL26
 	 .owner = THIS_MODULE,
-#endif
+//#endif
 	 .pf = PF_INET,
 	 .hooknum = NF_INET_LOCAL_OUT,
 	 .priority = NF_IP_PRI_FILTER,
 	 },
 	{
 	 .hook = kaodv_hook,
-#ifdef KERNEL26
+//#ifdef KERNEL26
 	 .owner = THIS_MODULE,
-#endif
+//#endif
 	 .pf = PF_INET,
 	 .hooknum = NF_INET_POST_ROUTING,
 	 .priority = NF_IP_PRI_FILTER,
@@ -351,9 +372,9 @@ static int __init kaodv_init(void)
 	struct net_device *dev = NULL;
 	int i, ret = -ENOMEM;
 
-#ifndef KERNEL26
-	EXPORT_NO_SYMBOLS;
-#endif
+//#ifndef KERNEL26
+//	EXPORT_NO_SYMBOLS;
+//#endif
 
 	kaodv_expl_init();
 
@@ -387,23 +408,32 @@ static int __init kaodv_init(void)
 	/* Prefetch network device info (ip, broadcast address, ifindex). */
 	for (i = 0; i < MAX_INTERFACES; i++) {
 		if (!ifname[i])
+		{
+			printk(KERN_DEBUG "kaodv: No name available for %d!\n", i);
 			break;
-
+		}
 		dev = dev_get_by_name(&init_net, ifname[i]);
 
 		if (!dev) {
-			printk("No device %s available, ignoring!\n",
+			printk(KERN_DEBUG "kaodv: No device %s available, ignoring!\n",
 			       ifname[i]);
 			continue;
 		}
 		if_info_add(dev);
 
 		dev_put(dev);
+		
+		printk(KERN_DEBUG "kaodv: add dev %d.\n", i);
 	}
 	
+	
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+//	proc_net_create("kaodv", 0, kaodv_proc_info);
+//#else
     if (!create_proc_read_entry("kaodv", 0, init_net.proc_net, kaodv_read_proc,
                             NULL))
         KAODV_DEBUG("Could not create kaodv proc entry");
+//#endif
 	KAODV_DEBUG("Module init OK");
 
 	return ret;
@@ -431,7 +461,11 @@ static void __exit kaodv_exit(void)
 
 	for (i = 0; i < sizeof(kaodv_ops) / sizeof(struct nf_hook_ops); i++)
 		nf_unregister_hook(&kaodv_ops[i]);
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+//	proc_net_remove("kaodv");
+//#else
 	proc_net_remove(&init_net, "kaodv");
+//#endif
 	kaodv_queue_fini();
 	kaodv_expl_fini();
 	kaodv_netlink_fini();

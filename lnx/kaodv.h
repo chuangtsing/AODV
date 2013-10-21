@@ -21,21 +21,21 @@
  *****************************************************************************/
 #ifndef _KAODV_H
 #define _KAODV_H
-
+/*
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
 #define SKB_TAIL_PTR(skb) skb->tail
 #define SKB_NETWORK_HDR_RAW(skb) skb->nh.raw
 #define SKB_NETWORK_HDR_RIPH(skb) skb->nh.iph
 #define SKB_MAC_HDR_RAW(skb) skb->mac.raw
 #define SKB_SET_NETWORK_HDR(skb, offset) (skb->nh.raw = (skb->data + (offset)))
-#else
+#else*/
 #define SKB_TAIL_PTR(skb) skb_tail_pointer(skb)
 #define SKB_NETWORK_HDR_RAW(skb) skb_network_header(skb)
 #define SKB_NETWORK_HDR_IPH(skb) ((struct iphdr *)skb_network_header(skb))
 #define SKB_MAC_HDR_RAW(skb) skb_mac_header(skb)
 #define SKB_SET_NETWORK_HDR(skb, offset) skb_set_network_header(skb, offset)
-#endif
-
+//#endif
+/*
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31))
 static inline struct dst_entry *skb_dst(const struct sk_buff *skb)
 {
@@ -47,7 +47,7 @@ static inline void skb_dst_set(struct sk_buff *skb, struct dst_entry *dst)
 	skb->dst = dst;
 }
 #endif
-
+*/
 
 
 #define AODV_PORT 654

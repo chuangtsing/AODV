@@ -5,19 +5,23 @@
 #include <linux/inetdevice.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include "kaodv-ipenc.h"
 
 /* Interface information */
 struct if_info {
 	struct list_head l;
 	struct in_addr if_addr;
 	struct in_addr bc_addr;
+	int orig_mtu;
 	struct net_device *dev;
 };
 
 static LIST_HEAD(ifihead);
-static rwlock_t ifilock = RW_LOCK_UNLOCKED;
+static rwlock_t ifilock = __RW_LOCK_UNLOCKED(ifilock);
 /* extern struct list_head ifihead; */
 /* extern rwlock_t ifilock; */
+
+#define MIN_IP_ENCAP_SIZE sizeof(struct min_ipenc_hdr)
 
 static inline int if_info_add(struct net_device *dev)
 {
@@ -32,6 +36,12 @@ static inline int if_info_add(struct net_device *dev)
 	ifi->dev = dev;
 
 	dev_hold(dev);
+
+	ifi->orig_mtu = dev->mtu;
+
+    rtnl_lock();
+    dev_set_mtu(dev, dev->mtu - MIN_IP_ENCAP_SIZE);
+    rtnl_unlock();
 
 	indev = in_dev_get(dev);
 
@@ -66,6 +76,9 @@ static inline void if_info_purge(void)
 	list_for_each_safe(pos, n, &ifihead) {
 		struct if_info *ifi = (struct if_info *)pos;
 		list_del(&ifi->l);
+		rtnl_lock();
+        	dev_set_mtu(ifi->dev, ifi->orig_mtu);
+        	rtnl_unlock();
 		dev_put(ifi->dev);
 		kfree(ifi);
 	}

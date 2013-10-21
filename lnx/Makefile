@@ -1,5 +1,5 @@
-ifneq (,$(findstring 2.6,$(KERNELRELEASE)))
-EXTRA_CFLAGS += -D KERNEL26 $(XDEFS)
+ifneq (,$(findstring 3.0,$(KERNELRELEASE)))
+EXTRA_CFLAGS += -D KERNEL30 $(XDEFS)
 obj-m += kaodv.o
 kaodv-objs := kaodv-mod.o kaodv-debug.o kaodv-netlink.o kaodv-queue.o kaodv-ipenc.o kaodv-expl.o 
 else
@@ -8,16 +8,17 @@ KOBJS := kaodv-mod.o kaodv-debug.o kaodv-netlink.o kaodv-queue.o kaodv-ipenc.o k
 KOBJS_ARM := $(KOBJS:%.o=%-arm.o)
 KOBJS_MIPS := $(KOBJS:%.o=%-mips.o)
 
-KERNEL=$(shell uname -r)
+#KERNEL=$(shell uname -r)
 #KERNEL_DIR=/lib/modules/$(KERNEL)/build
 #KERNEL_DIR=/usr/src/linux-headers-3.0.0-32
-KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
+KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/android_kernel_samsung_d2
+#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
 KERNEL_INC=$(KERNEL_DIR)/include
 THIS_DIR=$(shell pwd)
 
 # You might want to use gcc32 for the kernel module on Fedora core 1
-KCC=gcc
-LD=ld
+CC=arm-none-linux-gnueabi-gcc
+LD=arm-none-linux-gnueabi-ld
 XDEFS=
 
 # Some shell scripting to find out Linux kernel version
@@ -27,23 +28,23 @@ SUBLEVEL=$(shell grep ^SUBLEVEL $(KERNEL_DIR)/Makefile | cut -d' ' -f 3)
 
 # These are the options for the kernel module with kernel 2.4.x:
 #==============================================
-KINC=-nostdinc -DMODVERSIONS -include $(KERNEL_INC)/linux/modversions.h $(shell $(CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp') -I$(KERNEL_INC)
-KDEFS=-D__KERNEL__ -DMODULE
-KCFLAGS=-Wall -Wno-strict-aliasing -O2 $(KDEFS) $(KINC) $(XDEFS)
-KCFLAGS_ARM=-Wall -O2 -D__KERNEL__ -DMODULE -nostdinc $(shell $(ARM_CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp') -I$(KERNEL_INC)
-KCFLAGS_MIPS=-Wall -mips2 -O2 -fno-pic -mno-abicalls -mlong-calls -G0 -msoft-float -D__KERNEL__ -DMODULE -nostdinc $(shell $(MIPS_CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp') -I$(KERNEL_INC) $(XDEFS)
+#KINC=-nostdinc -DMODVERSIONS -include $(KERNEL_INC)/linux/modversions.h $(shell $(CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/#gp') -I$(KERNEL_INC)
+#KDEFS=-D__KERNEL__ -DMODULE
+#KCFLAGS=-Wall -Wno-strict-aliasing -O2 $(KDEFS) $(KINC) $(XDEFS)
+#KCFLAGS_ARM=-Wall -O2 -D__KERNEL__ -DMODULE -nostdinc $(shell $(ARM_CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp') -I##$(KERNEL_INC)
+#KCFLAGS_MIPS=-Wall -mips2 -O2 -fno-pic -mno-abicalls -mlong-calls -G0 -msoft-float -D__KERNEL__ -DMODULE -nostdinc $(shell $(MIPS_CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp') -I$(KERNEL_INC) $(XDEFS)
 
-.PHONY: clean clean-2.4 clean-2.6 indent default
+.PHONY: clean clean-3.0 indent default
 
 # Check for kernel version
-ifeq ($(PATCHLEVEL),6)
+#ifeq ($(PATCHLEVEL),6)
 default: kaodv.ko
-clean: clean-2.6
-else 
+clean: clean-3.0
+#else 
 # Assume kernel 2.4
-default: kaodv.o
-clean: clean-2.4
-endif
+#default: kaodv.o
+#clean: clean-2.4
+#endif
 
 #default: kaodv.ko
 $(KOBJS): %.o: %.c Makefile
@@ -80,12 +81,10 @@ kaodv-mips.ko: $(KOBJS_MIPS:%.o=%.c) Makefile
 	cp $@ ../kaodv.ko
 
 
-clean-2.6:
+clean-3.0:
 	$(MAKE) -C $(KERNEL_DIR) SUBDIRS=$(THIS_DIR) clean
 	rm -rf *.o *~
 
-clean-2.4:
-	rm -rf *.o *~
 
 TAGS:
 	etags *.c *.h

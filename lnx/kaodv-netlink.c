@@ -20,18 +20,18 @@
  *
  *****************************************************************************/
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
-#include <linux/config.h>
-#endif
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19))
+//#include <linux/config.h>
+//#endif
 #include <linux/if.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 #include <linux/netlink.h>
 #include <linux/version.h>
 
-#ifdef KERNEL26
+//#ifdef KERNEL26
 #include <linux/security.h>
-#endif
+//#endif
 #include <net/sock.h>
 
 #include "kaodv-netlink.h"
@@ -42,14 +42,14 @@
 
 static int peer_pid;
 static struct sock *kaodvnl;
-/*static DECLARE_MUTEX(kaodvnl_sem);*/
+//static DECLARE_MUTEX(kaodvnl_sem);
 static DEFINE_SEMAPHORE(kaodvnl_sem);
 
 /* For 2.4 backwards compatibility */
-#ifndef KERNEL26
-#define sk_receive_queue receive_queue
-#define sk_socket socket
-#endif
+//#ifndef KERNEL26
+//#define sk_receive_queue receive_queue
+//#define sk_socket socket
+//#endif
 
 extern int active_route_timeout, qual_th, is_gateway;
 
@@ -80,7 +80,7 @@ static struct sk_buff *kaodv_netlink_build_msg(int type, void *data, int len)
 	
 	return skb;
 
-      nlmsg_failure:
+    nlmsg_failure:
 	if (skb)
 		kfree_skb(skb);
 
@@ -122,6 +122,7 @@ void kaodv_netlink_send_rt_msg(int type, __u32 src, __u32 dest)
 
 /* 	netlink_unicast(kaodvnl, skb, peer_pid, MSG_DONTWAIT); */
 	netlink_broadcast(kaodvnl, skb, 0, AODVGRP_NOTIFY, GFP_USER);
+	printk(KERN_EMERG "kaodv sending route message for %u \n", dest);
 }
 
 void kaodv_netlink_send_rt_update_msg(int type, __u32 src, __u32 dest,
@@ -197,6 +198,7 @@ static int kaodv_netlink_receive_peer(unsigned char type, void *msg,
 			ret = kaodv_expl_add(m->dst, m->nhop, m->time,
 					     m->flags, m->ifindex);
 		}
+		printk(KERN_DEBUG "kaodv: KAODVM_ADDROUTE!\n");
 		kaodv_queue_set_verdict(KAODV_QUEUE_SEND, m->dst);
 		break;
 	case KAODVM_DELROUTE:
@@ -288,15 +290,15 @@ static inline void kaodv_netlink_rcv_skb(struct sk_buff *skb)
 /* 	printk("kaodv_netlink: type=%d\n", type); */
 	/* if (type < NLMSG_NOOP || type >= IPQM_MAX) */
 /* 		RCV_SKB_FAIL(-EINVAL); */
-#ifdef KERNEL26
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
-	if (security_netlink_recv(skb))
-		RCV_SKB_FAIL(-EPERM);
-#else
+//#ifdef KERNEL26
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
+//	if (security_netlink_recv(skb))
+//		RCV_SKB_FAIL(-EPERM);
+//#else
 	if (security_netlink_recv(skb, CAP_NET_ADMIN))
 		RCV_SKB_FAIL(-EPERM);
-#endif
-#endif
+//#endif
+//#endif
 	//write_lock_bh(&queue_lock);
 	
 	if (peer_pid) {
@@ -344,16 +346,16 @@ static void kaodv_netlink_rcv_sk(struct sock *sk, int len)
 int kaodv_netlink_init(void)
 {
 	netlink_register_notifier(&kaodv_nl_notifier);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14))
+/*#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14))
 	kaodvnl = netlink_kernel_create(NETLINK_AODV, kaodv_netlink_rcv_sk);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
 	kaodvnl = netlink_kernel_create(NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_sk, THIS_MODULE);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 	kaodvnl = netlink_kernel_create(NETLINK_AODV, AODVGRP_MAX, kaodv_netlink_rcv_sk, NULL, THIS_MODULE);
-#else
+#else*/
 	kaodvnl = netlink_kernel_create(&init_net, NETLINK_AODV, AODVGRP_MAX,
                     kaodv_netlink_rcv_skb, NULL, THIS_MODULE);
-#endif
+//#endif
 	if (kaodvnl == NULL) {
 		printk(KERN_ERR "kaodv_netlink: failed to create netlink socket\n");
 		netlink_unregister_notifier(&kaodv_nl_notifier);

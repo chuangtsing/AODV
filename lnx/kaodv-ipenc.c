@@ -47,42 +47,32 @@ struct sk_buff *ip_pkt_encapsulate(struct sk_buff *skb, __u32 dest)
 
 
     struct min_ipenc_hdr *ipe;    
-    struct sk_buff *nskb;
     struct iphdr *iph;
     
-    /* Allocate new data space at head */
-    nskb = skb_copy_expand(skb, skb_headroom(skb),
-			   skb_tailroom(skb) +
-			   sizeof(struct min_ipenc_hdr), 
-			   GFP_ATOMIC);
-
-    if (nskb == NULL) {
-	printk("Could not allocate new skb\n");
-	kfree_skb(skb);
-	return NULL;	
-    }
-
-    /* Set old owner */
-    if (skb->sk != NULL)
-	skb_set_owner_w(nskb, skb->sk);
 
     iph = SKB_NETWORK_HDR_IPH(skb);
 
-    skb_put(nskb, sizeof(struct min_ipenc_hdr));
+	if(!skb_make_writable(skb, (iph->ihl << 2))) {
+		printk(KERN_DEBUG "kaodv: Could not make skb writable\n");
+		return NULL;
+	}
+
+	/* Allocate new data space at head */
+	if(skb_cow(skb,sizeof(struct min_ipenc_hdr)))
+	{
+		printk(KERN_DEBUG "kaodv: Could not make enough head room\n");
+		return NULL;
+	}
+	
+	skb_push(skb, sizeof(struct min_ipenc_hdr));
     
-    /* Move the IP header */
-    memcpy(nskb->data, skb->data, (iph->ihl << 2));
-    /* Move the data */
-    memcpy(nskb->data + (iph->ihl << 2) + sizeof(struct min_ipenc_hdr), 
-	   skb->data + (iph->ihl << 2), skb->len - (iph->ihl << 2));
+    memmove(skb->data, skb->data + sizeof(struct min_ipenc_hdr), (iph->ihl << 2));
     
-    kfree_skb(skb);
-    skb = nskb;
     
     /* Update pointers */
     
-    SKB_SET_NETWORK_HDR(skb, 0);
-    iph = SKB_NETWORK_HDR_IPH(skb);
+    iph = (struct iphdr *)skb->data;
+    skb->network_header = skb->data;
 
     ipe = (struct min_ipenc_hdr *)(SKB_NETWORK_HDR_RAW(skb) + (iph->ihl << 2));
     
@@ -115,20 +105,21 @@ struct sk_buff *ip_pkt_decapsulate(struct sk_buff *skb)
     /* skb->nh.iph is probably not set yet */
     struct iphdr *iph = SKB_NETWORK_HDR_IPH(skb);
 
+	if(!skb_make_writable(skb,(iph->ihl << 2))) {
+		printk(KERN_DEBUG "kaodv: Could not make skb writable\n");
+		return NULL;
+	}
+
     ipe = (struct min_ipenc_hdr *)((char *)iph + (iph->ihl << 2));
 
     iph->protocol = ipe->protocol;
     iph->daddr = ipe->daddr;
     
-    /* Shift the data to the left, overwriting the encap header */
-    memmove(skb->data + (iph->ihl << 2), 
-	    skb->data + (iph->ihl << 2) + sizeof(struct min_ipenc_hdr), 
-	    skb->len - (iph->ihl << 2) - sizeof(struct min_ipenc_hdr));
+    memmove(skb->data + sizeof(struct min_ipenc_hdr),skb->data, (iph->ihl << 2));
+	skb_pull(skb,sizeof(struct min_ipenc_hdr));
     
-    skb_trim(skb, skb->len - sizeof(struct min_ipenc_hdr));
-    
-    SKB_SET_NETWORK_HDR(skb, 0);
-    iph = SKB_NETWORK_HDR_IPH(skb);
+    iph = (struct iphdr *)skb->data;
+    skb->network_header = skb->data;
 
     iph->tot_len = htons((ntohs(iph->tot_len) - sizeof(struct min_ipenc_hdr))); 
     ip_send_check(iph);

@@ -622,7 +622,7 @@ int main(int argc, char **argv)
 	    exit(0);
 	/* Close stdin, stdout and stderr... */
 	/*  close(0); */
-	close(1);
+	close(1); 
 	close(2);
 	setsid();
     }

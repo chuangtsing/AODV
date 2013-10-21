@@ -64,7 +64,7 @@ struct kaodv_queue_entry {
 typedef int (*kaodv_queue_cmpfn) (struct kaodv_queue_entry *, unsigned long);
 
 static unsigned int queue_maxlen = KAODV_QUEUE_QMAX_DEFAULT;
-static rwlock_t queue_lock = RW_LOCK_UNLOCKED;
+static rwlock_t queue_lock = __RW_LOCK_UNLOCKED(queue_lock);
 static unsigned int queue_total;
 static LIST_HEAD(queue_list);
 
@@ -247,13 +247,13 @@ int kaodv_queue_set_verdict(int verdict, __u32 daddr)
 				if (!entry->skb)
 					goto next;
 			}
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
+/*#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18))
 			ip_route_me_harder(&entry->skb);
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 			ip_route_me_harder(&entry->skb, RTN_LOCAL);
-#else
+#else*/
 			ip_route_me_harder(entry->skb, RTN_LOCAL);
-#endif
+//#endif
 			pkts++;
 
 			/* Inject packet */
@@ -264,7 +264,7 @@ int kaodv_queue_set_verdict(int verdict, __u32 daddr)
 	}
 	return 0;
 }
-
+/*
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
 static int kaodv_queue_get_info(char *buffer, char **start, off_t offset, int length)
 {
@@ -286,7 +286,7 @@ static int kaodv_queue_get_info(char *buffer, char **start, off_t offset, int le
 		len = 0;
 	return len;
 }
-#else
+#else*/
 static int kaodv_queue_get_info(char *page, char **start, off_t off, int count,
                     int *eof, void *data)
 {
@@ -308,7 +308,7 @@ static int kaodv_queue_get_info(char *page, char **start, off_t off, int count,
 		len = 0;
 	return len;
 }
-#endif
+//#endif
 
 static int init_or_cleanup(int init)
 {
@@ -320,33 +320,33 @@ static int init_or_cleanup(int init)
 
 	queue_total = 0;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
-	proc = proc_net_create(KAODV_QUEUE_PROC_FS_NAME, 0, kaodv_queue_get_info);
-#else
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+//	proc = proc_net_create(KAODV_QUEUE_PROC_FS_NAME, 0, kaodv_queue_get_info);
+//#else
 	proc = create_proc_read_entry(KAODV_QUEUE_PROC_FS_NAME, 0, init_net.proc_net, kaodv_queue_get_info, NULL);
-#endif
+//#endif
 	if (!proc) {
 	  printk(KERN_ERR "kaodv_queue: failed to create proc entry\n");
 	  return -1;
 	}
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
-	proc->owner = THIS_MODULE;
-#endif
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
+//	proc->owner = THIS_MODULE;
+//#endif
 
 	return 1;
 	
  cleanup:
-#ifdef KERNEL26
+//#ifdef KERNEL26
 	synchronize_net();
-#endif
+//#endif
 	kaodv_queue_flush();
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
-	proc_net_remove(KAODV_QUEUE_PROC_FS_NAME);
-#else
+//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24))
+//	proc_net_remove(KAODV_QUEUE_PROC_FS_NAME);
+//#else
 	proc_net_remove(&init_net, KAODV_QUEUE_PROC_FS_NAME);
-#endif
+//#endif
 	return status;
 }
 

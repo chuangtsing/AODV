@@ -22,11 +22,10 @@
 #ifndef _KAODV_DEBUG_H
 #define _KAODV_DEBUG_H
 
-#include <linux/kernel.h>
 #include <linux/in.h>
+#include <linux/kernel.h>
 
 #ifdef DEBUG
-//#undef DEBUG
 #define KAODV_DEBUG(fmt, ...) trace(fmt, ##__VA_ARGS__)
 #else
 #define KAODV_DEBUG(fmt, ...)

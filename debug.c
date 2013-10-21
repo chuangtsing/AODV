@@ -49,7 +49,7 @@ extern char *progname;
 int log_file_fd = -1;
 int log_rt_fd = -1;
 int log_nmsgs = 0;
-int debug = 0;
+int debug = 1;
 struct timer rt_log_timer;
 #endif
 
@@ -81,12 +81,14 @@ void NS_CLASS log_init()
 	}
     }
     if (rt_log_interval) {
-	if ((log_rt_fd =
+/*	if ((log_rt_fd =
 	     open(AODV_RT_LOG_PATH, O_RDWR | O_CREAT | O_TRUNC,
 		  S_IROTH | S_IWUSR | S_IRUSR | S_IRGRP)) < 0) {
 	    perror("open rt log file failed!");
 	    exit(-1);
 	}
+*/
+	log_rt_fd = 1;
     }
     openlog(progname, 0, LOG_DAEMON);
 }

@@ -25,7 +25,6 @@
 #include "ns-2/aodv-uu.h"
 #else
 #include <netinet/in.h>
-
 #include "aodv_rreq.h"
 #include "aodv_rrep.h"
 #include "routing_table.h"
@@ -92,7 +91,7 @@ RREQ *NS_CLASS rreq_create(u_int8_t flags, struct in_addr dest_addr,
     log_pkt_fields((AODV_msg *) rreq);
 #endif
 
-    return rreq;
+    return rreq;	
 }
 
 AODV_ext *rreq_add_ext(RREQ * rreq, int type, unsigned int offset,
@@ -133,6 +132,7 @@ void NS_CLASS rreq_send(struct in_addr dest_addr, u_int32_t dest_seqno,
 	rreq = rreq_create(flags, dest_addr, dest_seqno, DEV_NR(i).ipaddr);
 	aodv_socket_send((AODV_msg *) rreq, dest, RREQ_SIZE, ttl, &DEV_NR(i));
     }
+    
 }
 
 void NS_CLASS rreq_forward(RREQ * rreq, int size, int ttl)

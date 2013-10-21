@@ -69,8 +69,8 @@
 #define AODV_RT_LOG_PATH_SUFFIX ".rtlog"
 #define AODV_LOG_PATH_SUFFIX ".log"
 #else
-#define AODV_LOG_PATH "aodvd.log"
-#define AODV_RT_LOG_PATH "aodvd.rtlog"
+#define AODV_LOG_PATH "/data/data/org.span/files/aodvd.log"
+#define AODV_RT_LOG_PATH "/data/data/org.span/files/aodvd.rtlog"
 #endif				/* NS_PORT */
 
 #define max(A,B) ( (A) > (B) ? (A):(B))

@@ -18,18 +18,19 @@ OBJS_MIPS = $(SRC:%.c=%-mips.o)
 OBJS_NS = $(SRC_NS:%.c=%-ns.o)
 OBJS_NS_CPP = $(SRC_NS_CPP:%.cc=%-ns.o)
 
-KERNEL=$(shell uname -r)
+#KERNEL=$(shell uname -r)
 # Change to compile against different kernel (can be overridden):
 #KERNEL_DIR=/lib/modules/$(KERNEL)/build
 #KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
-KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
+#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
 #KERNEL_DIR=/usr/src/linux-headers-3.0.0-32
+KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/android_kernel_samsung_d2
 KERNEL_INC=$(KERNEL_DIR)/include
 
 # Compiler and options:
 # ##### for RCP use: big-endian
-CC=gcc
-LD=ld
+CC=arm-none-linux-gnueabi-gcc
+LD=arm-none-linux-gnueabi-ld
 ARM_CC=arm-none-linux-gnueabi-gcc
 #ARM_CCFLAGS=-mbig-endian
 ARM_LD=arm-none-linux-gnueabi-ld

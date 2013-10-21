@@ -196,7 +196,7 @@ static void nl_kaodv_callback(int sock)
 	case KAODVM_DEBUG:
 		DEBUG(LOG_DEBUG, 0, "kaodv: %s", NLMSG_DATA(nlm));
 		break;
-       	case KAODVM_TIMEOUT:
+    case KAODVM_TIMEOUT:
 		m = NLMSG_DATA(nlm);
 		dest_addr.s_addr = m->dst;
 
