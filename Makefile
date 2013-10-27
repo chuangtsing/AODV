@@ -21,10 +21,9 @@ OBJS_NS_CPP = $(SRC_NS_CPP:%.cc=%-ns.o)
 #KERNEL=$(shell uname -r)
 # Change to compile against different kernel (can be overridden):
 #KERNEL_DIR=/lib/modules/$(KERNEL)/build
-#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
-#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
+KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
 #KERNEL_DIR=/usr/src/linux-headers-3.0.0-32
-KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/android_kernel_samsung_d2
+#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/android_kernel_samsung_d2
 KERNEL_INC=$(KERNEL_DIR)/include
 
 # Compiler and options:

@@ -37,7 +37,7 @@
 #include "params.h"
 
 extern int unidir_hack, optimized_hellos, llfeedback;
-
+extern struct in_addr server_addr;
 #endif
 
 RREP *NS_CLASS rrep_create(u_int8_t flags,
@@ -248,7 +248,7 @@ void NS_CLASS rrep_process(RREP * rrep, int rreplen, struct in_addr ip_src,
     int inet_rrep = 0;
 #endif
 
-    /* Convert to correct byte order on affeected fields: */
+    /* Convert to correct byte order on affected fields: */
     rrep_dest.s_addr = rrep->dest_addr;
     rrep_orig.s_addr = rrep->orig_addr;
     rrep_seqno = ntohl(rrep->dest_seqno);
@@ -256,16 +256,17 @@ void NS_CLASS rrep_process(RREP * rrep, int rreplen, struct in_addr ip_src,
     /* Increment RREP hop count to account for intermediate node... */
     rrep_new_hcnt = rrep->hcnt + 1;
 
-    if (rreplen < (int) RREP_SIZE) {
-	alog(LOG_WARNING, 0, __FUNCTION__,
-	     "IP data field too short (%u bytes)"
-	     " from %s to %s", rreplen, ip_to_str(ip_src), ip_to_str(ip_dst));
-	return;
+    if (rreplen < (int) RREP_SIZE) 
+    {
+		alog(LOG_WARNING, 0, __FUNCTION__,
+			 "IP data field too short (%u bytes)"
+			 " from %s to %s", rreplen, ip_to_str(ip_src), ip_to_str(ip_dst));
+		return;
     }
 
     /* Ignore messages which aim to a create a route to one self */
     if (rrep_dest.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr)
-	return;
+		return;
 
     DEBUG(LOG_DEBUG, 0, "from %s about %s->%s",
 	  ip_to_str(ip_src), ip_to_str(rrep_orig), ip_to_str(rrep_dest));
@@ -276,35 +277,36 @@ void NS_CLASS rrep_process(RREP * rrep, int rreplen, struct in_addr ip_src,
     /* Determine whether there are any extensions */
     ext = (AODV_ext *) ((char *) rrep + RREP_SIZE);
 
-    while ((rreplen - extlen) > RREP_SIZE) {
-	switch (ext->type) {
-	case RREP_EXT:
-	    DEBUG(LOG_INFO, 0, "RREP include EXTENSION");
-	    /* Do something here */
-	    break;
+    while ((rreplen - extlen) > RREP_SIZE) 
+    {
+		switch (ext->type) {
+		case RREP_EXT:
+			DEBUG(LOG_INFO, 0, "RREP include EXTENSION");
+			/* Do something here */
+			break;
 #ifdef CONFIG_GATEWAY
-	case RREP_INET_DEST_EXT:
-	    if (ext->length == sizeof(u_int32_t)) {
+		case RREP_INET_DEST_EXT:
+			if (ext->length == sizeof(u_int32_t)) 
+			{
+				/* Destination address in RREP is the gateway address, while the
+				 * extension holds the real destination */
+				memcpy(&inet_dest_addr, AODV_EXT_DATA(ext), ext->length);
 
-		/* Destination address in RREP is the gateway address, while the
-		 * extension holds the real destination */
-		memcpy(&inet_dest_addr, AODV_EXT_DATA(ext), ext->length);
-
-		DEBUG(LOG_DEBUG, 0, "RREP_INET_DEST_EXT: <%s>",
-		      ip_to_str(inet_dest_addr));
-		/* This was a RREP from a gateway */
-		rt_flags |= RT_GATEWAY;
-		inet_rrep = 1;
-		break;
-	    }
+				DEBUG(LOG_DEBUG, 0, "RREP_INET_DEST_EXT: <%s>",
+					  ip_to_str(inet_dest_addr));
+				/* This was a RREP from a gateway */
+				rt_flags |= RT_GATEWAY;
+				inet_rrep = 1;
+				break;
+			}
 #endif
-	default:
-	    alog(LOG_WARNING, 0, __FUNCTION__, "Unknown or bad extension %d",
-		 ext->type);
-	    break;
-	}
-	extlen += AODV_EXT_SIZE(ext);
-	ext = AODV_EXT_NEXT(ext);
+		default:
+			alog(LOG_WARNING, 0, __FUNCTION__, "Unknown or bad extension %d",
+			 ext->type);
+			break;
+		}
+		extlen += AODV_EXT_SIZE(ext);
+		ext = AODV_EXT_NEXT(ext);
     }
 
     /* ---------- CHECK IF WE SHOULD MAKE A FORWARD ROUTE ------------ */
@@ -312,98 +314,117 @@ void NS_CLASS rrep_process(RREP * rrep, int rreplen, struct in_addr ip_src,
     fwd_rt = rt_table_find(rrep_dest);
     rev_rt = rt_table_find(rrep_orig);
 
-    if (!fwd_rt) {
-	/* We didn't have an existing entry, so we insert a new one. */
-	fwd_rt = rt_table_insert(rrep_dest, ip_src, rrep_new_hcnt, rrep_seqno,
+    if (!fwd_rt) 
+    {
+		/* We didn't have an existing entry, so we insert a new one. */
+		fwd_rt = rt_table_insert(rrep_dest, ip_src, rrep_new_hcnt, rrep_seqno,
 				 rrep_lifetime, VALID, rt_flags, ifindex);
-    } else if (fwd_rt->dest_seqno == 0 ||
+    } 
+    else if (fwd_rt->flags & RT_INET_DEST ||
+			fwd_rt->dest_seqno == 0 ||
 	       (int32_t) rrep_seqno > (int32_t) fwd_rt->dest_seqno ||
 	       (rrep_seqno == fwd_rt->dest_seqno &&
 		(fwd_rt->state == INVALID || fwd_rt->flags & RT_UNIDIR ||
-		 rrep_new_hcnt < fwd_rt->hcnt))) {
-	pre_repair_hcnt = fwd_rt->hcnt;
-	pre_repair_flags = fwd_rt->flags;
+		 rrep_new_hcnt < fwd_rt->hcnt))) 
+	{
+		pre_repair_hcnt = fwd_rt->hcnt;
+		pre_repair_flags = fwd_rt->flags;
 
-	fwd_rt = rt_table_update(fwd_rt, ip_src, rrep_new_hcnt, rrep_seqno,
-				 rrep_lifetime, VALID,
-				 rt_flags | fwd_rt->flags);
-    } else {
-	if (fwd_rt->hcnt > 1) {
-	    DEBUG(LOG_DEBUG, 0,
-		  "Dropping RREP, fwd_rt->hcnt=%d fwd_rt->seqno=%ld",
-		  fwd_rt->hcnt, fwd_rt->dest_seqno);
-	}
-	return;
+		/*Replace RT_INET_DEST if exists a route to destination*/
+		if(fwd_rt->flags & RT_INET_DEST)
+		{
+			fwd_rt = rt_table_update(fwd_rt, ip_src, rrep_new_hcnt, rrep_seqno,
+					 rrep_lifetime, VALID, (rt_flags | fwd_rt->flags ^ RT_INET_DEST));
+		}
+		else
+			fwd_rt = rt_table_update(fwd_rt, ip_src, rrep_new_hcnt, rrep_seqno,
+					 rrep_lifetime, VALID, rt_flags | fwd_rt->flags);
+    } 
+    else 
+    {
+		if (fwd_rt->hcnt > 1) 
+		{
+			DEBUG(LOG_DEBUG, 0,
+			  "Dropping RREP, fwd_rt->hcnt=%d fwd_rt->seqno=%ld",
+			  fwd_rt->hcnt, fwd_rt->dest_seqno);
+		}
+		return;
     }
 
 
     /* If the RREP_ACK flag is set we must send a RREP
        acknowledgement to the destination that replied... */
-    if (rrep->a) {
-	RREP_ack *rrep_ack;
+    if (rrep->a) 
+    {
+		RREP_ack *rrep_ack;
 
-	rrep_ack = rrep_ack_create();
-	aodv_socket_send((AODV_msg *) rrep_ack, fwd_rt->next_hop,
-			 NEXT_HOP_WAIT, MAXTTL, &DEV_IFINDEX(fwd_rt->ifindex));
-	/* Remove RREP_ACK flag... */
-	rrep->a = 0;
+		rrep_ack = rrep_ack_create();
+		aodv_socket_send((AODV_msg *) rrep_ack, fwd_rt->next_hop,
+				 NEXT_HOP_WAIT, MAXTTL, &DEV_IFINDEX(fwd_rt->ifindex));
+		/* Remove RREP_ACK flag... */
+		rrep->a = 0;
     }
 
     /* Check if this RREP was for us (i.e. we previously made a RREQ
        for this host). */
-    if (rrep_orig.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr) {
+    if (rrep_orig.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr) 
+    {
 #ifdef CONFIG_GATEWAY
-	if (inet_rrep) {
-	    rt_table_t *inet_rt;
-	    inet_rt = rt_table_find(inet_dest_addr);
+		if (inet_rrep) 
+		{
+			if(inet_dest_addr.s_addr == server_addr.s_addr)
+			{		
+				rt_table_t *inet_rt;
+				inet_rt = rt_table_find(inet_dest_addr);
 
-	    /* Add a "fake" route indicating that this is an Internet
-	     * destination, thus should be encapsulated and routed through a
-	     * gateway... */
-	    if (!inet_rt)
-		rt_table_insert(inet_dest_addr, rrep_dest, rrep_new_hcnt, 0,
-				rrep_lifetime, VALID, RT_INET_DEST, ifindex);
-	    else if (inet_rt->state == INVALID || rrep_new_hcnt < inet_rt->hcnt) {
-		rt_table_update(inet_rt, rrep_dest, rrep_new_hcnt, 0,
-				rrep_lifetime, VALID, RT_INET_DEST |
-				inet_rt->flags);
-	    } else {
-		DEBUG(LOG_DEBUG, 0, "INET Response, but no update %s",
-		      ip_to_str(inet_dest_addr));
-	    }
-	}
-#endif				/* CONFIG_GATEWAY */
+				/* Add a "fake" route indicating that this is an Internet
+				 * destination, thus should be encapsulated and routed through a
+				 * gateway... */
+				if (!inet_rt)
+					rt_table_insert(inet_dest_addr, rrep_dest, rrep_new_hcnt, 0,
+							rrep_lifetime, VALID, RT_INET_DEST, ifindex);
+				else if (inet_rt->state == INVALID || ((inet_rt->flags & RT_INET_DEST) && rrep_new_hcnt < inet_rt->hcnt)) {
+					rt_table_update(inet_rt, rrep_dest, rrep_new_hcnt, 0,
+						rrep_lifetime, VALID, RT_INET_DEST | inet_rt->flags);
+				} else {
+					DEBUG(LOG_DEBUG, 0, "INET Response, but no update %s",ip_to_str(inet_dest_addr));
+				}
+			} 
+		}
+#endif	/* CONFIG_GATEWAY */
 
 	/* If the route was previously in repair, a NO DELETE RERR should be
 	   sent to the source of the route, so that it may choose to reinitiate
 	   route discovery for the destination. Fixed a bug here that caused the
 	   repair flag to be unset and the RERR never being sent. Thanks to
 	   McWood <hjw_5@hotmail.com> for discovering this. */
-	if (pre_repair_flags & RT_REPAIR) {
-	    if (fwd_rt->hcnt > pre_repair_hcnt) {
-		RERR *rerr;
-		u_int8_t rerr_flags = 0;
-		struct in_addr dest;
+		if (pre_repair_flags & RT_REPAIR) {
+			if (fwd_rt->hcnt > pre_repair_hcnt) {
+				RERR *rerr;
+				u_int8_t rerr_flags = 0;
+				struct in_addr dest;
 
-		dest.s_addr = AODV_BROADCAST;
+				dest.s_addr = AODV_BROADCAST;
 
-		rerr_flags |= RERR_NODELETE;
-		rerr = rerr_create(rerr_flags, fwd_rt->dest_addr,
-				   fwd_rt->dest_seqno);
+				rerr_flags |= RERR_NODELETE;
+				rerr = rerr_create(rerr_flags, fwd_rt->dest_addr,
+						   fwd_rt->dest_seqno);
 
-		if (fwd_rt->nprec)
-		    aodv_socket_send((AODV_msg *) rerr, dest,
-				     RERR_CALC_SIZE(rerr), 1,
-				     &DEV_IFINDEX(fwd_rt->ifindex));
-	    }
-	}
-    } else {
-	/* --- Here we FORWARD the RREP on the REVERSE route --- */
-	if (rev_rt && rev_rt->state == VALID) {
-	    rrep_forward(rrep, rreplen, rev_rt, fwd_rt, --ip_ttl);
-	} else {
-	    DEBUG(LOG_DEBUG, 0, "Could not forward RREP - NO ROUTE!!!");
-	}
+				if (fwd_rt->nprec)
+					aodv_socket_send((AODV_msg *) rerr, dest,
+							 RERR_CALC_SIZE(rerr), 1,
+							 &DEV_IFINDEX(fwd_rt->ifindex));
+			}
+		}
+    } 
+    else 
+    {
+		/* --- Here we FORWARD the RREP on the REVERSE route --- */
+		if (rev_rt && rev_rt->state == VALID) {
+			rrep_forward(rrep, rreplen, rev_rt, fwd_rt, --ip_ttl);
+		} else {
+			DEBUG(LOG_DEBUG, 0, "Could not forward RREP - NO ROUTE!!!");
+		}
     }
 
     if (!llfeedback && optimized_hellos)

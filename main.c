@@ -53,6 +53,7 @@ int unidir_hack = 0;
 int rreq_gratuitous = 0;
 int expanding_ring_search = 1;
 int internet_gw_mode = 0;
+int network_diameter = 50;
 int local_repair = 0;
 int receive_n_hellos = 0;
 int hello_jittering = 1;
@@ -64,6 +65,8 @@ int qual_threshold = 0;
 int llfeedback = 0;
 int gw_prefix = 1;
 struct timer worb_timer;	/* Wait on reboot timer */
+struct in_addr server_addr;  /*server IP address*/
+
 
 /* Dynamic configuration values */
 int active_route_timeout = ACTIVE_ROUTE_TIMEOUT_HELLO;
@@ -91,6 +94,7 @@ struct option longopts[] = {
     {"rate-limit", no_argument, NULL, 'R'},
     {"version", no_argument, NULL, 'V'},
     {"llfeedback", no_argument, NULL, 'f'},
+    {"server IP address", required_argument, NULL, 's'},
     {0}
 };
 
@@ -122,6 +126,7 @@ void usage(int status)
 	 "-R, --rate-limit        Toggle rate limiting of RREQs and RERRs (default ON).\n"
 	 "-q, --quality-threshold Set a minimum signal quality threshold for control packets.\n"
 	 "-V, --version           Show version.\n\n"
+	 "-s, --server-IP-address Set server address to upload data.\n"
 	 "Erik Nordström, <erik.nordstrom@it.uu.se>\n\n",
 	 progname, AODV_LOG_PATH, AODV_RT_LOG_PATH);
 
@@ -579,6 +584,10 @@ int main(int argc, char **argv)
 	    if (optarg && isdigit(*optarg))
 		rt_log_interval = atof(optarg) * 1000;
 	    break;
+	case 's':
+		if (optarg && isdigit(*optarg))
+		inet_aton(optarg, &server_addr);
+		break;
 	case 'u':
 	    unidir_hack = !unidir_hack;
 	    break;

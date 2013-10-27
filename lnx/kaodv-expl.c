@@ -387,7 +387,7 @@ int kaodv_expl_update(__u32 daddr, __u32 nhop, unsigned long time,
 	__kaodv_expl_set_next_timeout();
 #endif
 
-      unlock:
+    unlock:
 	write_unlock_bh(&expl_lock);
 
 	return ret;

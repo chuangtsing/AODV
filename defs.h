@@ -228,6 +228,7 @@ typedef struct {
 #define AODV_EXT_NEXT(ext) ((AODV_ext *)((char *)ext + AODV_EXT_HDR_SIZE + ext->length))
 #define AODV_EXT_SIZE(ext) (AODV_EXT_HDR_SIZE + ext->length)
 
+
 #ifndef NS_PORT
 /* The callback function */
 typedef void (*callback_func_t) (int);

@@ -142,6 +142,17 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 	/* We are only interested in IP packets */
 	if (iph == NULL)
 		return NF_ACCEPT;
+		
+	/* Hook FORWARD only takecare of gateway packets */
+	if(hooknum == NF_INET_FORWARD)
+	{
+		//we are only handle forwarded packets in gateway mode
+		if(!is_gateway)
+			return NF_ACCEPT;
+		//we don't process packets from binded interface
+		if(!in || if_info_from_ifindex(NULL, NULL, in->ifindex) == 0)
+			return NF_ACCEPT;
+	}
 	
 	/* We want AODV control messages to go through directly to the
 	 * AODV socket.... */
@@ -154,11 +165,7 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 		    ntohs(udph->source) == AODV_PORT) {
 
 #ifdef CONFIG_QUAL_THRESHOLD
-//#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
-//			qual = (int)(skb)->__unused;
-//#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
 			qual = (skb)->iwq.qual;
-//#endif
 			if (qual_th && hooknum == NF_INET_PRE_ROUTING) {
 
 				if (qual && qual < qual_th) {
@@ -243,6 +250,7 @@ static unsigned int kaodv_hook(unsigned int hooknum,
 			return NF_STOLEN;
 		}
 		break;
+	case NF_INET_FORWARD:
 	case NF_INET_LOCAL_OUT:
 		printk(KERN_DEBUG "kaodv: NF_INET_LOCAL_OUT\n");
 		
@@ -321,29 +329,30 @@ module_param(qual_th, int, 0);
 static struct nf_hook_ops kaodv_ops[] = {
 	{
 	 .hook = kaodv_hook,
-//#ifdef KERNEL26
 	 .owner = THIS_MODULE,
-//#endif
 	 .pf = PF_INET,
 	 .hooknum = NF_INET_PRE_ROUTING,
 	 .priority = NF_IP_PRI_FIRST,
 	 },
 	{
 	 .hook = kaodv_hook,
-//#ifdef KERNEL26
 	 .owner = THIS_MODULE,
-//#endif
 	 .pf = PF_INET,
 	 .hooknum = NF_INET_LOCAL_OUT,
 	 .priority = NF_IP_PRI_FILTER,
 	 },
 	{
 	 .hook = kaodv_hook,
-//#ifdef KERNEL26
 	 .owner = THIS_MODULE,
-//#endif
 	 .pf = PF_INET,
 	 .hooknum = NF_INET_POST_ROUTING,
+	 .priority = NF_IP_PRI_FILTER,
+	 },
+	{
+	 .hook = kaodv_hook,
+	 .owner = THIS_MODULE,
+	 .pf = PF_INET,
+	 .hooknum = NF_INET_FORWARD,
 	 .priority = NF_IP_PRI_FILTER,
 	 },
 };
@@ -403,7 +412,10 @@ static int __init kaodv_init(void)
 	if (ret < 0)
 		goto cleanup_hook1;
 
+	ret = nf_register_hook(&kaodv_ops[3]);
 
+	if (ret < 0)
+		goto cleanup_hook2;
 
 	/* Prefetch network device info (ip, broadcast address, ifindex). */
 	for (i = 0; i < MAX_INTERFACES; i++) {
@@ -438,6 +450,8 @@ static int __init kaodv_init(void)
 
 	return ret;
 
+cleanup_hook2:
+	nf_unregister_hook(&kaodv_ops[2]);
 cleanup_hook1:
 	nf_unregister_hook(&kaodv_ops[1]);
 cleanup_hook0:

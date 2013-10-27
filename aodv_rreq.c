@@ -55,6 +55,7 @@ struct blacklist *rreq_blacklist_find(struct in_addr dest_addr);
 
 extern int rreq_gratuitous, expanding_ring_search;
 extern int internet_gw_mode;
+extern int network_diameter;
 #endif
 
 RREQ *NS_CLASS rreq_create(u_int8_t flags, struct in_addr dest_addr,
@@ -187,29 +188,31 @@ void NS_CLASS rreq_process(RREQ * rreq, int rreqlen, struct in_addr ip_src,
        or we buffer our own sent RREQ's as we do with others we
        receive. */
     if (rreq_orig.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr)
-	return;
+		return;
 
     DEBUG(LOG_DEBUG, 0, "ip_src=%s rreq_orig=%s rreq_dest=%s ttl=%d",
-	  ip_to_str(ip_src), ip_to_str(rreq_orig), ip_to_str(rreq_dest), 
-	  ip_ttl);
+			ip_to_str(ip_src), ip_to_str(rreq_orig), ip_to_str(rreq_dest), 
+			ip_ttl);
 
-    if (rreqlen < (int) RREQ_SIZE) {
-	alog(LOG_WARNING, 0,
-	     __FUNCTION__, "IP data field too short (%u bytes)"
-	     "from %s to %s", rreqlen, ip_to_str(ip_src), ip_to_str(ip_dst));
-	return;
+    if (rreqlen < (int) RREQ_SIZE)
+    {
+		alog(LOG_WARNING, 0,
+			 __FUNCTION__, "IP data field too short (%u bytes)"
+			 "from %s to %s", rreqlen, ip_to_str(ip_src), ip_to_str(ip_dst));
+		return;
     }
 
     /* Check if the previous hop of the RREQ is in the blacklist set. If
        it is, then ignore the RREQ. */
-    if (rreq_blacklist_find(ip_src)) {
-	DEBUG(LOG_DEBUG, 0, "prev hop of RREQ blacklisted, ignoring!");
-	return;
+    if (rreq_blacklist_find(ip_src)) 
+    {
+		DEBUG(LOG_DEBUG, 0, "prev hop of RREQ blacklisted, ignoring!");
+		return;
     }
 
     /* Ignore already processed RREQs. */
     if (rreq_record_find(rreq_orig, rreq_id))
-	return;
+		return;
 
     /* Now buffer this RREQ so that we don't process a similar RREQ we
        get within PATH_DISCOVERY_TIME. */
@@ -218,20 +221,23 @@ void NS_CLASS rreq_process(RREQ * rreq, int rreqlen, struct in_addr ip_src,
     /* Determine whether there are any RREQ extensions */
     ext = (AODV_ext *) ((char *) rreq + RREQ_SIZE);
 
-    while ((rreqlen - extlen) > RREQ_SIZE) {
-	switch (ext->type) {
-	case RREQ_EXT:
-	    DEBUG(LOG_INFO, 0, "RREQ include EXTENSION");
-	    /* Do something here */
-	    break;
-	default:
-	    alog(LOG_WARNING, 0, __FUNCTION__, "Unknown extension type %d",
-		 ext->type);
-	    break;
-	}
-	extlen += AODV_EXT_SIZE(ext);
-	ext = AODV_EXT_NEXT(ext);
+    while ((rreqlen - extlen) > RREQ_SIZE) 
+    {
+		switch (ext->type) 
+		{
+			case RREQ_EXT:
+				DEBUG(LOG_INFO, 0, "RREQ include EXTENSION");
+				/* Do something here */
+				break;
+			default:
+				alog(LOG_WARNING, 0, __FUNCTION__, "Unknown extension type %d",
+				 ext->type);
+				break;
+		}
+		extlen += AODV_EXT_SIZE(ext);
+		ext = AODV_EXT_NEXT(ext);
     }
+    
 #ifdef DEBUG_OUTPUT
     log_pkt_fields((AODV_msg *) rreq);
 #endif
@@ -243,175 +249,172 @@ void NS_CLASS rreq_process(RREQ * rreq, int rreqlen, struct in_addr ip_src,
     /* Calculate the extended minimal life time. */
     life = PATH_DISCOVERY_TIME - 2 * rreq_new_hcnt * NODE_TRAVERSAL_TIME;
 
-    if (rev_rt == NULL) {
-	DEBUG(LOG_DEBUG, 0, "Creating REVERSE route entry, RREQ orig: %s",
-	      ip_to_str(rreq_orig));
+    if (rev_rt == NULL) 
+    {
+		DEBUG(LOG_DEBUG, 0, "Creating REVERSE route entry, RREQ orig: %s",
+			  ip_to_str(rreq_orig));
 
-	rev_rt = rt_table_insert(rreq_orig, ip_src, rreq_new_hcnt,
-				 rreq_orig_seqno, life, VALID, 0, ifindex);
-    } else {
-	if (rev_rt->dest_seqno == 0 ||
-	    (int32_t) rreq_orig_seqno > (int32_t) rev_rt->dest_seqno ||
-	    (rreq_orig_seqno == rev_rt->dest_seqno &&
-	     (rev_rt->state == INVALID || rreq_new_hcnt < rev_rt->hcnt))) {
-	    rev_rt = rt_table_update(rev_rt, ip_src, rreq_new_hcnt,
+		rev_rt = rt_table_insert(rreq_orig, ip_src, rreq_new_hcnt,
+					 rreq_orig_seqno, life, VALID, 0, ifindex);
+    } 
+    else 
+    {
+		if (rev_rt->dest_seqno == 0 ||
+				(int32_t) rreq_orig_seqno > (int32_t) rev_rt->dest_seqno ||
+				(rreq_orig_seqno == rev_rt->dest_seqno &&
+					(rev_rt->state == INVALID || rreq_new_hcnt < rev_rt->hcnt))) 
+		{
+			rev_rt = rt_table_update(rev_rt, ip_src, rreq_new_hcnt,
 				     rreq_orig_seqno, life, VALID,
 				     rev_rt->flags);
-	}
-#ifdef DISABLED
-	/* This is a out of draft modification of AODV-UU to prevent
-	   nodes from creating routing entries to themselves during
-	   the RREP phase. We simple drop the RREQ if there is a
-	   missmatch between the reverse path on the node and the one
-	   suggested by the RREQ. */
-
-	else if (rev_rt->next_hop.s_addr != ip_src.s_addr) {
-	    DEBUG(LOG_DEBUG, 0, "Dropping RREQ due to reverse route mismatch!");
-	    return;
-	}
-#endif
+		}	
     }
-    /**** END updating/creating REVERSE route ****/
+ 
 
-#ifdef CONFIG_GATEWAY
+#ifdef CONFIG_GATEWAY_DISABLE
     /* This is a gateway */
-    if (internet_gw_mode) {
-	/* Subnet locality decision */
-	switch (locality(rreq_dest, ifindex)) {
-	case HOST_ADHOC:
-	    break;
-	case HOST_INET:
-	    /* We must increase the gw's sequence number before sending a RREP,
-	     * otherwise intermediate nodes will not forward the RREP. */
-	    seqno_incr(this_host.seqno);
-	    rrep = rrep_create(0, 0, 0, DEV_IFINDEX(rev_rt->ifindex).ipaddr,
-			       this_host.seqno, rev_rt->dest_addr,
-			       ACTIVE_ROUTE_TIMEOUT);
+    if (internet_gw_mode) 
+    {
+		/* Subnet locality decision */
+		switch (locality(rreq_dest, ifindex)) 
+		{
+			case HOST_ADHOC:
+				break;
+			case HOST_INET:
+				/* We must increase the gw's sequence number before sending a RREP,
+				 * otherwise intermediate nodes will not forward the RREP. */
+				seqno_incr(this_host.seqno);
+				rrep = rrep_create(0, 0, 0, DEV_IFINDEX(rev_rt->ifindex).ipaddr,
+						   this_host.seqno, rev_rt->dest_addr,
+						   ACTIVE_ROUTE_TIMEOUT);
 
-	    ext = rrep_add_ext(rrep, RREP_INET_DEST_EXT, rrep_size,
-			       sizeof(struct in_addr), (char *) &rreq_dest);
+				ext = rrep_add_ext(rrep, RREP_INET_DEST_EXT, rrep_size,
+						   sizeof(struct in_addr), (char *) &rreq_dest);
 
-	    rrep_size += AODV_EXT_SIZE(ext);
+				rrep_size += AODV_EXT_SIZE(ext);
 
-	    DEBUG(LOG_DEBUG, 0,
-		  "Responding for INTERNET dest: %s rrep_size=%d",
-		  ip_to_str(rreq_dest), rrep_size);
+				DEBUG(LOG_DEBUG, 0,
+				  "Responding for INTERNET dest: %s rrep_size=%d",
+				  ip_to_str(rreq_dest), rrep_size);
 
-	    rrep_send(rrep, rev_rt, NULL, rrep_size);
+				rrep_send(rrep, rev_rt, NULL, rrep_size);
 
-	    return;
+				return;
 
-	case HOST_UNKNOWN:
-	default:
-	    DEBUG(LOG_DEBUG, 0, "GW: Destination unkown");
-	}
+			case HOST_UNKNOWN:
+			default:
+				DEBUG(LOG_DEBUG, 0, "GW: Destination unkown");
+		}
     }
 #endif
+
+
     /* Are we the destination of the RREQ?, if so we should immediately send a
        RREP.. */
-    if (rreq_dest.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr) {
+    if (rreq_dest.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr) 
+    {
 
-	/* WE are the RREQ DESTINATION. Update the node's own
-	   sequence number to the maximum of the current seqno and the
-	   one in the RREQ. */
-	if (rreq_dest_seqno != 0) {
-	    if ((int32_t) this_host.seqno < (int32_t) rreq_dest_seqno)
-		this_host.seqno = rreq_dest_seqno;
-	    else if (this_host.seqno == rreq_dest_seqno)
-		seqno_incr(this_host.seqno);
-	}
-	rrep = rrep_create(0, 0, 0, DEV_IFINDEX(rev_rt->ifindex).ipaddr,
-			   this_host.seqno, rev_rt->dest_addr,
-			   MY_ROUTE_TIMEOUT);
+		/* WE are the RREQ DESTINATION. Update the node's own
+		   sequence number to the maximum of the current seqno and the
+		   one in the RREQ. */
+		if (rreq_dest_seqno != 0) 
+		{
+			if ((int32_t) this_host.seqno < (int32_t) rreq_dest_seqno)
+			this_host.seqno = rreq_dest_seqno;
+			else if (this_host.seqno == rreq_dest_seqno)
+			seqno_incr(this_host.seqno);
+		}
+		rrep = rrep_create(0, 0, 0, DEV_IFINDEX(rev_rt->ifindex).ipaddr,
+				   this_host.seqno, rev_rt->dest_addr,
+				   MY_ROUTE_TIMEOUT);
 
-	rrep_send(rrep, rev_rt, NULL, RREP_SIZE);
+		rrep_send(rrep, rev_rt, NULL, RREP_SIZE);
 
-    } else {
-	/* We are an INTERMEDIATE node. - check if we have an active
-	 * route entry */
+    } 
+    else
+    {
+		/* We are an INTERMEDIATE node. - check if we have an active
+		 * route entry */
 
-	fwd_rt = rt_table_find(rreq_dest);
+		fwd_rt = rt_table_find(rreq_dest);
 
-	if (fwd_rt && fwd_rt->state == VALID && !rreq->d) {
-	    struct timeval now;
-	    u_int32_t lifetime;
+		if (fwd_rt && fwd_rt->state == VALID && !rreq->d) 
+		{
+			struct timeval now;
+			u_int32_t lifetime;
 
-	    /* GENERATE RREP, i.e we have an ACTIVE route entry that is fresh
-	       enough (our destination sequence number for that route is
-	       larger than the one in the RREQ). */
+			/* GENERATE RREP, i.e we have an ACTIVE route entry that is fresh
+			   enough (our destination sequence number for that route is
+			   larger than the one in the RREQ). */
 
-	    gettimeofday(&now, NULL);
-#ifdef CONFIG_GATEWAY_DISABLED
-	    if (fwd_rt->flags & RT_INET_DEST) {
-		rt_table_t *gw_rt;
-		/* This node knows that this is a rreq for an Internet
-		 * destination and it has a valid route to the gateway */
+			gettimeofday(&now, NULL);
+	    
+			/* Respond only if the sequence number is fresh enough... */
+			
+			if (fwd_rt->dest_seqno != 0 && 
+					(int32_t) fwd_rt->dest_seqno >= (int32_t) rreq_dest_seqno) 
+			{
+				lifetime = timeval_diff(&fwd_rt->rt_timer.timeout, &now);
+				rrep = rrep_create(0, 0, fwd_rt->hcnt, fwd_rt->dest_addr,
+					   fwd_rt->dest_seqno, rev_rt->dest_addr,
+					   lifetime);
+				rrep_send(rrep, rev_rt, fwd_rt, rrep_size);
+			} 
+			else 
+			{
+				goto forward;
+			}
+			/* If the GRATUITOUS flag is set, we must also unicast a
+			   gratuitous RREP to the destination. */
+			if (rreq->g) 
+			{
+				rrep = rrep_create(0, 0, rev_rt->hcnt, rev_rt->dest_addr,
+						   rev_rt->dest_seqno, fwd_rt->dest_addr,
+						   lifetime);
 
-		goto forward;	// DISABLED
+				rrep_send(rrep, fwd_rt, rev_rt, RREP_SIZE);
 
-		gw_rt = rt_table_find(fwd_rt->next_hop);
+				DEBUG(LOG_INFO, 0, "Sending G-RREP to %s with rte to %s",
+					  ip_to_str(rreq_dest), ip_to_str(rreq_orig));
+			}
+			return;
+		}
+    
+		forward:
+		
+		if (ip_ttl > 1) 
+		{
+			/* Update the sequence number in case the maintained one is
+			 * larger */
+			if (fwd_rt && !(fwd_rt->flags & RT_INET_DEST) &&
+			(int32_t) fwd_rt->dest_seqno > (int32_t) rreq_dest_seqno)
+				rreq->dest_seqno = htonl(fwd_rt->dest_seqno);
 
-		if (!gw_rt || gw_rt->state == INVALID)
-		    goto forward;
+			rreq_forward(rreq, rreqlen, --ip_ttl);
 
-		lifetime = timeval_diff(&gw_rt->rt_timer.timeout, &now);
+		} 
+		else 
+		{
+			DEBUG(LOG_DEBUG, 0, "RREQ not forwarded - ttl=0");
+		}
+		
+		/*gateway always replies RREQ with re-directing to internet 
+		  with hop count diameter of network */
+		
+		if(internet_gw_mode)
+		{	
+			seqno_incr(this_host.seqno);
+			rrep = rrep_create(0, 0, 0, DEV_IFINDEX(rev_rt->ifindex).ipaddr,
+					   this_host.seqno, rev_rt->dest_addr,
+					   ACTIVE_ROUTE_TIMEOUT);
 
-		rrep = rrep_create(0, 0, gw_rt->hcnt, gw_rt->dest_addr,
-				   gw_rt->dest_seqno, rev_rt->dest_addr,
-				   lifetime);
+			ext = rrep_add_ext(rrep, RREP_INET_DEST_EXT, RREP_SIZE,
+					   sizeof(struct in_addr), (char *) &rreq_dest);
 
-		ext = rrep_add_ext(rrep, RREP_INET_DEST_EXT, rrep_size,
-				   sizeof(struct in_addr), (char *) &rreq_dest);
-
-		rrep_size += AODV_EXT_SIZE(ext);
-
-		DEBUG(LOG_DEBUG, 0,
-		      "Intermediate node response for INTERNET dest: %s rrep_size=%d",
-		      ip_to_str(rreq_dest), rrep_size);
-
-		rrep_send(rrep, rev_rt, gw_rt, rrep_size);
-		return;
-	    }
-#endif				/* CONFIG_GATEWAY_DISABLED */
-
-	    /* Respond only if the sequence number is fresh enough... */
-	    if (fwd_rt->dest_seqno != 0 &&
-		(int32_t) fwd_rt->dest_seqno >= (int32_t) rreq_dest_seqno) {
-		lifetime = timeval_diff(&fwd_rt->rt_timer.timeout, &now);
-		rrep = rrep_create(0, 0, fwd_rt->hcnt, fwd_rt->dest_addr,
-				   fwd_rt->dest_seqno, rev_rt->dest_addr,
-				   lifetime);
-		rrep_send(rrep, rev_rt, fwd_rt, rrep_size);
-	    } else {
-		goto forward;
-	    }
-	    /* If the GRATUITOUS flag is set, we must also unicast a
-	       gratuitous RREP to the destination. */
-	    if (rreq->g) {
-		rrep = rrep_create(0, 0, rev_rt->hcnt, rev_rt->dest_addr,
-				   rev_rt->dest_seqno, fwd_rt->dest_addr,
-				   lifetime);
-
-		rrep_send(rrep, fwd_rt, rev_rt, RREP_SIZE);
-
-		DEBUG(LOG_INFO, 0, "Sending G-RREP to %s with rte to %s",
-		      ip_to_str(rreq_dest), ip_to_str(rreq_orig));
-	    }
-	    return;
-	}
-      forward:
-	if (ip_ttl > 1) {
-	    /* Update the sequence number in case the maintained one is
-	     * larger */
-	    if (fwd_rt && !(fwd_rt->flags & RT_INET_DEST) &&
-		(int32_t) fwd_rt->dest_seqno > (int32_t) rreq_dest_seqno)
-		rreq->dest_seqno = htonl(fwd_rt->dest_seqno);
-
-	    rreq_forward(rreq, rreqlen, --ip_ttl);
-
-	} else {
-	    DEBUG(LOG_DEBUG, 0, "RREQ not forwarded - ttl=0");
-	}
+			rrep_size += AODV_EXT_SIZE(ext);
+			
+			rrep_send(rrep, rev_rt, NULL, rrep_size);
+		}
     }
 }
 

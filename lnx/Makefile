@@ -11,8 +11,8 @@ KOBJS_MIPS := $(KOBJS:%.o=%-mips.o)
 #KERNEL=$(shell uname -r)
 #KERNEL_DIR=/lib/modules/$(KERNEL)/build
 #KERNEL_DIR=/usr/src/linux-headers-3.0.0-32
-KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/android_kernel_samsung_d2
-#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
+#KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/android_kernel_samsung_d2
+KERNEL_DIR=/home/zongqing/WORKING_DIRECTORY/kernel/s3
 KERNEL_INC=$(KERNEL_DIR)/include
 THIS_DIR=$(shell pwd)
 
