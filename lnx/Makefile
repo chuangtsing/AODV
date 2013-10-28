@@ -21,6 +21,8 @@ CC=arm-none-linux-gnueabi-gcc
 LD=arm-none-linux-gnueabi-ld
 XDEFS=
 
+
+
 # Some shell scripting to find out Linux kernel version
 VERSION=$(shell if [ ! -d $(KERNEL_DIR) ]; then echo "No linux source found!!! Check your setup..."; exit; fi; grep ^VERSION $(KERNEL_DIR)/Makefile | cut -d' ' -f 3)
 PATCHLEVEL=$(shell grep ^PATCHLEVEL $(KERNEL_DIR)/Makefile | cut -d' ' -f 3)

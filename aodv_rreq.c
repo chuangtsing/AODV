@@ -311,7 +311,8 @@ void NS_CLASS rreq_process(RREQ * rreq, int rreqlen, struct in_addr ip_src,
 
     /* Are we the destination of the RREQ?, if so we should immediately send a
        RREP.. */
-    if (rreq_dest.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr) 
+    if (rreq_dest.s_addr == DEV_IFINDEX(ifindex).ipaddr.s_addr 
+		|| rreq_dest.s_addr == AODV_BROADCAST) 
     {
 
 		/* WE are the RREQ DESTINATION. Update the node's own
@@ -324,12 +325,32 @@ void NS_CLASS rreq_process(RREQ * rreq, int rreqlen, struct in_addr ip_src,
 			else if (this_host.seqno == rreq_dest_seqno)
 			seqno_incr(this_host.seqno);
 		}
+		
+
 		rrep = rrep_create(0, 0, 0, DEV_IFINDEX(rev_rt->ifindex).ipaddr,
-				   this_host.seqno, rev_rt->dest_addr,
-				   MY_ROUTE_TIMEOUT);
-
+					   this_host.seqno, rev_rt->dest_addr,
+					   MY_ROUTE_TIMEOUT);
+					   		
 		rrep_send(rrep, rev_rt, NULL, RREP_SIZE);
+		
+		if(rreq_dest.s_addr == AODV_BROADCAST)
+		{
+			if (ip_ttl > 1) 
+			{
+				/* Update the sequence number in case the maintained one is
+				 * larger */
+				if (fwd_rt && !(fwd_rt->flags & RT_INET_DEST) &&
+				(int32_t) fwd_rt->dest_seqno > (int32_t) rreq_dest_seqno)
+					rreq->dest_seqno = htonl(fwd_rt->dest_seqno);
 
+				rreq_forward(rreq, rreqlen, --ip_ttl);
+
+			} 
+			else 
+			{
+				DEBUG(LOG_DEBUG, 0, "RREQ not forwarded - ttl=0");
+			}
+		}
     } 
     else
     {
@@ -398,8 +419,7 @@ void NS_CLASS rreq_process(RREQ * rreq, int rreqlen, struct in_addr ip_src,
 			DEBUG(LOG_DEBUG, 0, "RREQ not forwarded - ttl=0");
 		}
 		
-		/*gateway always replies RREQ with re-directing to internet 
-		  with hop count diameter of network */
+		/*gateway always replies RREQ with re-directing to internet*/
 		
 		if(internet_gw_mode)
 		{	

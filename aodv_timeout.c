@@ -42,7 +42,8 @@
 
 extern int expanding_ring_search, local_repair;
 void route_delete_timeout(void *arg);
-
+extern struct timer discovery_timer;
+extern int discovery_internal;
 #endif
 
 /* These are timeout functions which are called when timers expire... */
@@ -280,6 +281,16 @@ void NS_CLASS wait_on_reboot_timeout(void *arg)
 	*((int *) arg) = 0;
 
 	DEBUG(LOG_DEBUG, 0, "Wait on reboot over!!");
+}
+
+void node_discovery_timeout(void * arg)
+{
+	struct in_addr dest_addr;
+	dest_addr.s_addr = AODV_BROADCAST;
+	rreq_route_discovery(dest_addr, 0, NULL);
+	timer_set_timeout(&discovery_timer, discovery_internal);
+	DEBUG(LOG_DEBUG, 0, "Setup node discovery in %d mins\n", 
+			discovery_internal/60000);
 }
 
 #ifdef NS_PORT

@@ -39,17 +39,19 @@
 typedef struct {
     u_int8_t type;
 #if defined(__LITTLE_ENDIAN)
-    u_int8_t res1:4;
+    u_int8_t res1:3;
     u_int8_t d:1;
     u_int8_t g:1;
     u_int8_t r:1;
     u_int8_t j:1;
+    u_int8_t a:1;
 #elif defined(__BIG_ENDIAN)
+	u_int8_t a:1;		/* discovery all the nodes */
     u_int8_t j:1;		/* Join flag (multicast) */
     u_int8_t r:1;		/* Repair flag */
     u_int8_t g:1;		/* Gratuitous RREP flag */
     u_int8_t d:1;		/* Destination only respond */
-    u_int8_t res1:4;
+    u_int8_t res1:3;
 #else
 #error "Adjust your <bits/endian.h> defines"
 #endif

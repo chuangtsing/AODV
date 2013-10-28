@@ -30,9 +30,8 @@ KERNEL_INC=$(KERNEL_DIR)/include
 # ##### for RCP use: big-endian
 CC=arm-none-linux-gnueabi-gcc
 LD=arm-none-linux-gnueabi-ld
-ARM_CC=arm-none-linux-gnueabi-gcc
-#ARM_CCFLAGS=-mbig-endian
-ARM_LD=arm-none-linux-gnueabi-ld
+ARM_CC=arm-eabi-gcc
+ARM_LD=arm-eabi-ld
 MIPS_CC=mipsel-linux-gcc
 MIPS_LD=mipsel-linux-ld
 CPP=g++
@@ -40,8 +39,6 @@ OPTS=-Wall -O3 -static
 CPP_OPTS=-Wall
 
 export CC ARM_CC MIPS_CC
-
-
 
 # Comment out to disable debug operation...
 DEBUG=-g -DDEBUG

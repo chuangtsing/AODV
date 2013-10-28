@@ -64,8 +64,11 @@ int wait_on_reboot = 1;
 int qual_threshold = 0;
 int llfeedback = 0;
 int gw_prefix = 1;
-struct timer worb_timer;	/* Wait on reboot timer */
-struct in_addr server_addr;  /*server IP address*/
+struct timer worb_timer;	  /* Wait on reboot timer */
+struct in_addr server_addr;   /* server IP address    */
+struct timer discovery_timer; /* node discovery timer */
+long discovery_internal;       /* msecs between node discovery */
+int node_discovery_mode = 0;  
 
 
 /* Dynamic configuration values */
@@ -94,7 +97,8 @@ struct option longopts[] = {
     {"rate-limit", no_argument, NULL, 'R'},
     {"version", no_argument, NULL, 'V'},
     {"llfeedback", no_argument, NULL, 'f'},
-    {"server IP address", required_argument, NULL, 's'},
+    {"server-address", required_argument, NULL, 's'},
+    {"node-discovery", required_argument, NULL, 'c'},
     {0}
 };
 
@@ -126,7 +130,8 @@ void usage(int status)
 	 "-R, --rate-limit        Toggle rate limiting of RREQs and RERRs (default ON).\n"
 	 "-q, --quality-threshold Set a minimum signal quality threshold for control packets.\n"
 	 "-V, --version           Show version.\n\n"
-	 "-s, --server-IP-address Set server address to upload data.\n"
+	 "-s, --server-address    Set server address to upload data.\n"
+	 "-c, --node-discovery    Set node discovery mode.\n"
 	 "Erik Nordström, <erik.nordstrom@it.uu.se>\n\n",
 	 progname, AODV_LOG_PATH, AODV_RT_LOG_PATH);
 
@@ -536,7 +541,7 @@ int main(int argc, char **argv)
     while (1) {
 	int opt;
 
-	opt = getopt_long(argc, argv, "i:fjln:dghoq:r:s:uwxDLRV", longopts, 0);
+	opt = getopt_long(argc, argv, "i:fjln:dghoq:r:s:c:uwxDLRV", longopts, 0);
 
 	if (opt == EOF)
 	    break;
@@ -587,6 +592,13 @@ int main(int argc, char **argv)
 	case 's':
 		if (optarg && isdigit(*optarg))
 		inet_aton(optarg, &server_addr);
+		break;
+	case 'c':
+		if (optarg && isdigit(*optarg))
+		{
+			node_discovery_mode = !node_discovery_mode;
+			discovery_internal = atof(optarg) * 1000 * 60;
+		}
 		break;
 	case 'u':
 	    unidir_hack = !unidir_hack;
@@ -663,12 +675,19 @@ int main(int argc, char **argv)
 
     /* Set the wait on reboot timer... */
     if (wait_on_reboot) {
-	timer_init(&worb_timer, wait_on_reboot_timeout, &wait_on_reboot);
-	timer_set_timeout(&worb_timer, DELETE_PERIOD);
-	alog(LOG_NOTICE, 0, __FUNCTION__,
-	     "In wait on reboot for %d milliseconds. Disable with \"-D\".",
-	     DELETE_PERIOD);
+		timer_init(&worb_timer, wait_on_reboot_timeout, &wait_on_reboot);
+		timer_set_timeout(&worb_timer, DELETE_PERIOD);
+		alog(LOG_NOTICE, 0, __FUNCTION__,
+			 "In wait on reboot for %d milliseconds. Disable with \"-D\".",
+			 DELETE_PERIOD);
     }
+    
+    if(node_discovery_mode && internet_gw_mode)
+    {
+		timer_init(&discovery_timer, node_discovery_timeout, NULL);
+		timer_set_timeout(&discovery_timer, discovery_internal);
+		DEBUG(LOG_DEBUG, 0, "This is gateway and set with node discovery\n");
+	}
 
     /* Schedule the first Hello */
     if (!optimized_hellos && !llfeedback)
